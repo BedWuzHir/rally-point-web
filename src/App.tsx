@@ -27,6 +27,7 @@ import { AdminBookings, StaffBookings } from './pages/BookingsDesk'
 import { LoadingBlock } from './components/Shell'
 import { useEffect } from 'react'
 import { api } from './lib/api'
+import { HelpPage } from './pages/HelpPage'
 
 function homeFor(role: Role) {
   if (role === 'admin') return '/admin'
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/member/transactions" element={<MemberTransactions />} />
           <Route path="/member/notifications" element={<MemberNotifications />} />
           <Route path="/member/profile" element={<MemberProfile />} />
+          <Route path="/member/help" element={<HelpPage />} />
         </Route>
 
         <Route element={<Protected roles={['staff', 'admin']} />}>
@@ -81,6 +83,7 @@ export default function App() {
           <Route path="/staff/board" element={<StaffBoard />} />
           <Route path="/staff/open" element={<StaffOpenPlay />} />
           <Route path="/staff/courts" element={<StaffCourts />} />
+          <Route path="/staff/help" element={<HelpPage />} />
         </Route>
 
         <Route element={<Protected roles={['admin']} />}>
@@ -94,6 +97,7 @@ export default function App() {
           <Route path="/admin/bookings" element={<AdminBookings />} />
           <Route path="/admin/transactions" element={<AdminTransactions />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/help" element={<HelpPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

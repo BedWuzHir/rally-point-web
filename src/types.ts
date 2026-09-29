@@ -12,6 +12,8 @@ export type OpenPlayStatus = 'open' | 'full' | 'cancelled' | 'completed'
 export type OpenPlaySignupStatus = 'joined' | 'waitlist' | 'cancelled'
 export type ReminderKind = 'booking_confirm' | 'booking_reminder' | 'open_play_reminder'
 export type SkillLevel = 'all' | 'beginner' | 'intermediate' | 'advanced'
+export type InquiryCategory = 'booking' | 'membership' | 'payment' | 'technical' | 'other'
+export type InquiryStatus = 'open' | 'in_progress' | 'resolved'
 
 export interface Profile {
   id: string
@@ -135,6 +137,20 @@ export interface Notification {
   body: string
   read: boolean
   created_at: string
+}
+
+export interface SupportInquiry {
+  id: string
+  user_id: string
+  category: InquiryCategory
+  subject: string
+  message: string
+  status: InquiryStatus
+  created_at: string
+  response?: string | null
+  responded_by?: string | null
+  responded_at?: string | null
+  sender?: Pick<Profile, 'id' | 'full_name' | 'email'> | null
 }
 
 export interface WalkIn {

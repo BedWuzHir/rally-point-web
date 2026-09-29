@@ -19,6 +19,9 @@ import type {
   SkillLevel,
   Transaction,
   WalkIn,
+  SupportInquiry,
+  InquiryCategory,
+  InquiryStatus,
 } from '../types'
 import { CLUB_CLOSE_HOUR, CLUB_OPEN_HOUR, hourLabel, localRangeISO } from '../types'
 import { makePaymentRef } from './payments'
@@ -67,6 +70,7 @@ export interface DemoDB {
   checkins: CheckIn[]
   transactions: Transaction[]
   notifications: Notification[]
+  inquiries: SupportInquiry[]
   walkins: WalkIn[]
   sessionUserId: string | null
 }
@@ -364,6 +368,7 @@ function seed(): DemoDB {
   ]
   const openPlaySignups: OpenPlaySignup[] = []
   const reminders: Reminder[] = []
+  const inquiries: SupportInquiry[] = []
 
   return {
     profiles,
@@ -377,6 +382,7 @@ function seed(): DemoDB {
     checkins,
     transactions,
     notifications,
+    inquiries,
     walkins: [],
     sessionUserId: null,
   }
@@ -396,6 +402,7 @@ function load(): DemoDB {
           ? withoutPasswords.openPlaySignups
           : [],
         reminders: Array.isArray(withoutPasswords.reminders) ? withoutPasswords.reminders : [],
+        inquiries: Array.isArray(withoutPasswords.inquiries) ? withoutPasswords.inquiries : [],
       }
       const members = db.members.map((member) =>
         member.qr_token
@@ -422,6 +429,7 @@ function load(): DemoDB {
         !Array.isArray(withoutPasswords.openPlays) ||
         !Array.isArray(withoutPasswords.openPlaySignups) ||
         !Array.isArray(withoutPasswords.reminders)
+        || !Array.isArray(withoutPasswords.inquiries)
       ) {
         save(sanitizedDb)
       }
@@ -1129,6 +1137,100 @@ export const demoStore = {
     return load()
       .notifications.filter((n) => n.user_id === userId)
       .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+  },
+  createInquiry(input: {
+    user_id: string
+    category: InquiryCategory
+    subject: string
+    message: string
+  }) {
+    const db = load()
+    const actor = db.profiles.find((profile) => profile.id === db.sessionUserId)
+    if (!actor || actor.id !== input.user_id || !['staff', 'admin'].includes(actor.role)) {
+      throw new Error('Only staff and admins can submit inquiries for their own account')
+    }
+    const inquiry: SupportInquiry = {
+      id: uid('inq'),
+      ...input,
+      status: 'open',
+      created_at: todayISO(),
+    }
+    db.inquiries.unshift(inquiry)
+    save(db)
+    return inquiry
+  },
+  inquiriesForUser(userId: string) {
+    const db = load()
+    const actor = db.profiles.find((profile) => profile.id === db.sessionUserId)
+    if (!actor || actor.role !== 'staff' || actor.id !== userId) {
+      throw new Error('Staff can only view their own inquiries')
+    }
+    return db.inquiries
+      .filter((inquiry) => inquiry.user_id === userId)
+      .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+      .map((inquiry) => ({
+        ...inquiry,
+        sender: db.profiles.find((profile) => profile.id === inquiry.user_id),
+      }))
+  },
+  allInquiries() {
+    const db = load()
+    const actor = db.profiles.find((profile) => profile.id === db.sessionUserId)
+    if (!actor || actor.role !== 'admin') {
+      throw new Error('Only admins can view all inquiries')
+    }
+    return db.inquiries
+      .slice()
+      .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at))
+      .map((inquiry) => ({
+        ...inquiry,
+        sender: db.profiles.find((profile) => profile.id === inquiry.user_id),
+      }))
+  },
+  respondToInquiry(input: {
+    id: string
+    status: InquiryStatus
+    response?: string
+  }) {
+    const db = load()
+    const actor = db.profiles.find((profile) => profile.id === db.sessionUserId)
+    if (!actor || actor.role !== 'admin') {
+      throw new Error('Only admins can update inquiries')
+    }
+    if (!['open', 'in_progress', 'resolved'].includes(input.status)) {
+      throw new Error('Invalid inquiry status')
+    }
+    const inquiry = db.inquiries.find((row) => row.id === input.id)
+    if (!inquiry) throw new Error('Inquiry not found')
+    const response = input.response?.trim()
+    if (response && inquiry.responded_at) {
+      throw new Error('This inquiry already has an Admin response')
+    }
+    if (response && response.length > 2000) {
+      throw new Error('Response must be 2000 characters or fewer')
+    }
+    const statusChanged = inquiry.status !== input.status
+    const replied = Boolean(response)
+    if (!statusChanged && !replied) return inquiry
+
+    inquiry.status = input.status
+    if (response) {
+      inquiry.response = response
+      inquiry.responded_by = actor.id
+      inquiry.responded_at = todayISO()
+    }
+    const statusLabel = input.status.replace('_', ' ')
+    const replyNote = response ? ` Admin reply: ${response}` : ''
+    db.notifications.unshift({
+      id: uid('notif'),
+      user_id: inquiry.user_id,
+      title: 'Inquiry update',
+      body: `Your inquiry "${inquiry.subject}" is now ${statusLabel}.${replyNote}`,
+      read: false,
+      created_at: todayISO(),
+    })
+    save(db)
+    return inquiry
   },
   markNotifRead(id: string) {
     const db = load()

@@ -9,14 +9,20 @@ Developer handoff for the public login FAQ preview and the role-aware Help secti
 | Member | View the full FAQ and Contact Us details for staff. Members do not submit inquiries through the form. |
 | Staff | View the FAQ and admin contact details; submit categorized inquiries; view their own inquiry history, status, and the Admin response. Staff can see inquiry update notifications and mark them read in Help. |
 | Admin | View the FAQ and superadmin contact details; submit inquiries; view the inquiry inbox; change inquiry status; send one response per inquiry. |
+| Superadmin | View the FAQ and Platform operations contact details. Superadmins do not submit inquiries or load inquiry history/inbox data from Help. |
 
-All three roles have a Help destination in the role-specific navigation. The full Help pages are `/member/help`, `/staff/help`, and `/admin/help`. FAQ wording is shared from `src/lib/helpContent.ts`.
+Each role has a Help destination in the role-specific navigation. The full Help pages are `/member/help`, `/staff/help`, and `/admin/help`; Superadmin uses `/admin/help`. Public login FAQs use the shared `helpFaqs` from `src/lib/helpContent.ts`; signed-in Help uses separate role-specific FAQs from the same file.
+Role-specific FAQ links lead directly to existing Book, My QR, Account, Check in, Schedule, Courts, Bookings, Floor, or Superadmin Overview pages as appropriate. The FAQ entries only describe workflows already present in the app.
+
+Each top-level Help section available to the current role (FAQ, contact details, inquiry form, and staff history or admin inbox) is an independent expandable section. They start collapsed; users can open multiple sections at once. Quick answers appear first, followed by inquiry sections when available, and Contact appears last. Native disclosure summaries are keyboard operable. Individual FAQ questions remain expandable inside the FAQ section.
 
 The public login screen shows three expandable FAQ entries from the same shared content. It also shows Facebook and Instagram visual placeholders, but these are not links: official social URLs have not been supplied.
 
 ## Inquiry workflow
 
-Staff and Admin submissions require a category, subject (up to 120 characters), and message (up to 2,000 characters). A submission starts with status `open`.
+Staff and Admin submissions require a category, subject (up to 120 characters), and message (up to 2,000 characters). Superadmins currently have no inquiry form in Help. A submission starts with status `open`.
+
+Staff inquiry history and Admin inbox data are fetched when the corresponding section is first opened or when **Refresh** is used. A Staff section shows the unread inquiry-update count after data is loaded; the Admin inbox shows the count of open inquiries after data is loaded.
 
 Admins can set an inquiry to `open`, `in_progress`, or `resolved`. An Admin may save one response of up to 2,000 characters per inquiry. After responding, the response is shown on both Admin and submitting Staff views. Admins may still change the status later.
 

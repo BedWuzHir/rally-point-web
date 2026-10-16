@@ -1,3 +1,5 @@
+import type { Role } from '../types'
+
 export const helpFaqs = [
   {
     question: 'How do I book a court?',
@@ -25,3 +27,98 @@ export const helpFaqs = [
       'Rally Point is open daily from 6:00 AM to 10:00 PM. Court availability can change during events and maintenance.',
   },
 ] as const
+
+export const signedInHelpFaqs: Record<
+  Role,
+  readonly {
+    question: string
+    answer: string
+    action?: { label: string; to: string }
+  }[]
+> = {
+  member: [
+    {
+      question: 'How do I book a court?',
+      answer:
+        'Choose a date, court, and time in Book, then complete payment. Your booking is confirmed after payment.',
+      action: { label: 'Go to Book', to: '/member/book' },
+    },
+    {
+      question: 'How do I check in?',
+      answer: 'Show your My QR code to staff when you arrive.',
+      action: { label: 'Open My QR', to: '/member/pass' },
+    },
+    {
+      question: 'Can I cancel or change a booking?',
+      answer:
+        'Contact staff as soon as possible. They can check the booking status and available options.',
+    },
+    {
+      question: 'How do I renew my membership?',
+      answer:
+        'Open your Account or membership card and choose Renew. Contact staff if your membership details need correcting.',
+      action: { label: 'Open Account', to: '/member/profile' },
+    },
+    {
+      question: 'What are the club hours?',
+      answer:
+        'Rally Point is open daily from 6:00 AM to 10:00 PM. Court availability can change during events and maintenance.',
+    },
+  ],
+  staff: [
+    {
+      question: 'Where can I check in a member?',
+      answer: 'Use Check in to look up a member and help them check in.',
+      action: { label: 'Go to Check in', to: '/staff/checkin' },
+    },
+    {
+      question: 'Where can I check the schedule?',
+      answer: 'Open Schedule to review the court schedule.',
+      action: { label: 'Open Schedule', to: '/staff/board' },
+    },
+    {
+      question: 'Where can I review court status?',
+      answer: 'Open Courts to review the courts and their current status.',
+      action: { label: 'Open Courts', to: '/staff/courts' },
+    },
+    {
+      question: 'How do I follow up on an inquiry?',
+      answer:
+        'Submit a question in Help. Your inquiries section shows its status and any Admin reply.',
+    },
+  ],
+  admin: [
+    {
+      question: 'Where can I review bookings?',
+      answer: 'Open Bookings to review club bookings.',
+      action: { label: 'Open Bookings', to: '/admin/bookings' },
+    },
+    {
+      question: 'Where can I manage club operations?',
+      answer: 'Open Floor to access the club operations workspace.',
+      action: { label: 'Open Floor', to: '/admin/ops' },
+    },
+    {
+      question: 'Where can I check the schedule?',
+      answer: 'Open Schedule to review the court schedule.',
+      action: { label: 'Open Schedule', to: '/admin/board' },
+    },
+    {
+      question: 'How do I respond to a Staff inquiry?',
+      answer:
+        'Open Inquiry inbox in Help to review inquiries, update status, and send one reply per inquiry.',
+    },
+  ],
+  superadmin: [
+    {
+      question: 'Where can I review platform activity?',
+      answer: 'Open Overview to access the superadmin workspace.',
+      action: { label: 'Open Overview', to: '/superadmin' },
+    },
+    {
+      question: 'Who do I contact about platform operations?',
+      answer:
+        'Use the Platform operations contact details in Help for cloud infrastructure, database hosting, or payment provider escalations.',
+    },
+  ],
+}

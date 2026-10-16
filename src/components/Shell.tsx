@@ -312,10 +312,13 @@ export function LoadingBlock() {
   )
 }
 
-export function Toast({ message }: { message: string | null }) {
+export function Toast({ message, fadingOut = false }: { message: string | null; fadingOut?: boolean }) {
   if (!message) return null
   return (
-    <div className="toast" role="status">
+    <div
+      className={`toast transition-opacity duration-300 ease-out motion-reduce:transition-none${fadingOut ? ' pointer-events-none opacity-0' : ''}`}
+      role="status"
+    >
       {message}
     </div>
   )

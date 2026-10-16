@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,6 +44,14 @@ const adminUser = {
   created_at: '2026-09-01T00:00:00.000Z',
 } satisfies Profile
 
+const superadminUser = {
+  id: 'superadmin-1',
+  email: 'superadmin@example.com',
+  full_name: 'Alex Superadmin',
+  role: 'superadmin',
+  created_at: '2026-09-01T00:00:00.000Z',
+} satisfies Profile
+
 const inquiry = {
   id: 'inquiry-1',
   club_id: 'club_rally_point',
@@ -86,14 +94,124 @@ describe('Help inquiry workflow', () => {
     vi.mocked(api.markNotifRead).mockReset().mockResolvedValue(undefined)
   })
 
+  it('starts member Help sections collapsed and lets multiple sections stay open', async () => {
+    const user = userEvent.setup()
+    authState.user = null
+    renderHelp()
+
+    const faqHeading = screen.getByRole('heading', { name: 'Quick answers' })
+    const contactHeading = screen.getByRole('heading', { name: 'Contact staff' })
+    const faqSection = faqHeading.closest('details')
+    const contactSection = contactHeading.closest('details')
+    if (!faqSection || !contactSection) throw new Error('Expected Help section disclosures')
+
+    expect(faqSection.open).toBe(false)
+    expect(contactSection.open).toBe(false)
+    expect(screen.getByText('How do I book a court?')).not.toBeVisible()
+    const contactLink = screen.getByRole('link', { name: /support@rallypointgensan\.com/ })
+    expect(contactLink).not.toBeVisible()
+
+    await user.click(faqHeading)
+    await user.click(contactHeading)
+
+    expect(faqSection.open).toBe(true)
+    expect(contactSection.open).toBe(true)
+    expect(screen.getByText('How do I book a court?')).toBeVisible()
+    expect(contactLink).toBeVisible()
+    await user.click(screen.getByText('How do I book a court?'))
+    expect(screen.getByRole('link', { name: 'Go to Book' })).toHaveAttribute('href', '/member/book')
+  })
+
+  it('places Contact after all role-specific Help sections', () => {
+    authState.user = null
+    let view = renderHelp()
+    const sectionTitles = () =>
+      Array.from(document.querySelectorAll('main > details > summary [role="heading"]'))
+        .map((heading) => heading.textContent)
+
+    expect(sectionTitles()).toEqual(['Quick answers', 'Contact staff'])
+
+    view.unmount()
+    authState.user = staffUser
+    view = renderHelp()
+    expect(sectionTitles()).toEqual([
+      'Quick answers',
+      'Ask a question or submit an inquiry',
+      'Your inquiries',
+      'Contact admin',
+    ])
+
+    view.unmount()
+    authState.user = adminUser
+    view = renderHelp()
+    expect(sectionTitles()).toEqual([
+      'Quick answers',
+      'Ask a question or submit an inquiry',
+      'Inquiry inbox',
+      'Contact superadmin',
+    ])
+
+    view.unmount()
+    authState.user = superadminUser
+    view = renderHelp()
+    expect(sectionTitles()).toEqual(['Quick answers', 'Platform operations'])
+  })
+
+  it('shows role-specific quick answers with links to existing destinations', async () => {
+    const user = userEvent.setup()
+    authState.user = staffUser
+    const { unmount } = renderHelp()
+
+    await user.click(screen.getByRole('heading', { name: 'Quick answers' }))
+    expect(screen.getByText('Where can I check in a member?')).toBeVisible()
+    expect(screen.queryByText('How do I book a court?')).not.toBeInTheDocument()
+    await user.click(screen.getByText('Where can I check in a member?'))
+    expect(screen.getByRole('link', { name: 'Go to Check in' })).toHaveAttribute('href', '/staff/checkin')
+
+    unmount()
+    authState.user = adminUser
+    renderHelp()
+    await user.click(screen.getByRole('heading', { name: 'Quick answers' }))
+    expect(screen.getByText('Where can I review bookings?')).toBeVisible()
+    expect(screen.queryByText('Where can I check in a member?')).not.toBeInTheDocument()
+  })
+
+  it('keeps superadmin platform contacts but hides inquiry tools and does not load inquiries', async () => {
+    const user = userEvent.setup()
+    authState.user = superadminUser
+    renderHelp()
+
+    const contactHeading = await screen.findByRole('heading', { name: 'Platform operations' })
+    expect(screen.queryByRole('heading', { name: 'Ask a question or submit an inquiry' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Your inquiries' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Inquiry inbox' })).not.toBeInTheDocument()
+    expect(api.inquiries).not.toHaveBeenCalled()
+
+    await user.click(contactHeading)
+    expect(screen.getByRole('link', { name: /ops@rallypoint\.ph/ })).toBeVisible()
+    expect(screen.getByRole('link', { name: /\+63 917 555 0199/ })).toBeVisible()
+
+    expect(api.createInquiry).not.toHaveBeenCalled()
+    expect(api.inquiries).not.toHaveBeenCalled()
+    expect(api.notifications).not.toHaveBeenCalled()
+  })
+
   it('shows a staff member their own history, reply status, and readable in-app update', async () => {
     const user = userEvent.setup()
     renderHelp()
 
-    expect(await screen.findByRole('heading', { name: 'Your inquiries' })).toBeInTheDocument()
+    const inquiriesHeading = await screen.findByRole('heading', { name: 'Your inquiries' })
+    const inquiryFormHeading = screen.getByRole('heading', { name: 'Ask a question or submit an inquiry' })
+    const inquiryFormSection = inquiryFormHeading.closest('details')
+    if (!inquiryFormSection) throw new Error('Expected inquiry form disclosure')
+    expect(inquiryFormSection.open).toBe(false)
+    expect(api.inquiries).not.toHaveBeenCalled()
+    expect(api.notifications).not.toHaveBeenCalled()
+    await user.click(inquiriesHeading)
     expect(await screen.findByText('Schedule access')).toBeInTheDocument()
     expect(screen.getByText(updateNotification.body)).toBeInTheDocument()
     expect(api.inquiries).toHaveBeenCalledWith(staffUser.id, 'staff')
+    expect(await screen.findByText('1 unread update')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => expect(api.inquiries).toHaveBeenCalledTimes(2))
@@ -102,18 +220,86 @@ describe('Help inquiry workflow', () => {
     expect(api.markNotifRead).toHaveBeenCalledWith(updateNotification.id)
   })
 
+  it('fades and removes a successful inquiry confirmation after four seconds', async () => {
+    const user = userEvent.setup()
+    const view = renderHelp()
+    try {
+      await user.click(screen.getByRole('heading', { name: 'Ask a question or submit an inquiry' }))
+      await user.type(screen.getByLabelText('Subject'), 'Court booking question')
+      await user.type(screen.getByLabelText('Your question or details'), 'Please check my booking.')
+
+      vi.useFakeTimers()
+      const form = screen.getByRole('button', { name: 'Send inquiry' }).closest('form')
+      if (!form) throw new Error('Expected inquiry form')
+      await act(async () => {
+        fireEvent.submit(form)
+        await Promise.resolve()
+      })
+      const toast = screen.getByRole('status')
+      expect(toast).toHaveTextContent('Your inquiry was sent. The team will follow up.')
+      expect(toast).not.toHaveClass('opacity-0')
+
+      act(() => vi.advanceTimersByTime(4000))
+      expect(screen.getByRole('status')).toHaveClass('opacity-0')
+
+      act(() => vi.advanceTimersByTime(300))
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      view.unmount()
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps inquiry submission errors visible after the success timeout', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.createInquiry).mockRejectedValue(new Error('Unable to reach the server.'))
+    const view = renderHelp()
+    try {
+      await user.click(screen.getByRole('heading', { name: 'Ask a question or submit an inquiry' }))
+      await user.type(screen.getByLabelText('Subject'), 'Court booking question')
+      await user.type(screen.getByLabelText('Your question or details'), 'Please check my booking.')
+
+      vi.useFakeTimers()
+      const form = screen.getByRole('button', { name: 'Send inquiry' }).closest('form')
+      if (!form) throw new Error('Expected inquiry form')
+      await act(async () => {
+        fireEvent.submit(form)
+        await Promise.resolve()
+      })
+      expect(screen.getByRole('status')).toHaveTextContent('Unable to reach the server.')
+
+      act(() => vi.advanceTimersByTime(10000))
+      expect(screen.getByRole('status')).toHaveTextContent('Unable to reach the server.')
+      expect(screen.getByRole('status')).not.toHaveClass('opacity-0')
+    } finally {
+      view.unmount()
+      vi.clearAllTimers()
+      vi.useRealTimers()
+    }
+  })
+
   it('lets an Admin change status and submit one reply', async () => {
     const user = userEvent.setup()
     authState.user = adminUser
     renderHelp()
 
     const inbox = await screen.findByRole('heading', { name: 'Inquiry inbox' })
+    const inquiryFormHeading = screen.getByRole('heading', { name: 'Ask a question or submit an inquiry' })
+    const inboxSection = inbox.closest('details')
+    const inquiryFormSection = inquiryFormHeading.closest('details')
+    if (!inboxSection || !inquiryFormSection) throw new Error('Expected Admin Help disclosures')
+    expect(inboxSection.open).toBe(false)
+    expect(inquiryFormSection.open).toBe(false)
     expect(inbox).toBeInTheDocument()
+    expect(api.inquiries).not.toHaveBeenCalled()
+    await user.click(inbox)
     expect(await screen.findByText((_, element) =>
       element?.tagName === 'P' &&
       (element.textContent?.includes(`${staffUser.full_name} · ${staffUser.email} · booking`) ?? false),
     )).toBeInTheDocument()
     expect(api.inquiries).toHaveBeenCalledWith(adminUser.id, 'admin')
+    expect(await screen.findByText('1 open inquiry')).toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText('Status'), 'in_progress')
     await user.type(screen.getByLabelText('Admin reply (one reply per inquiry)'), 'I updated your access.')
@@ -156,6 +342,7 @@ describe('Help inquiry workflow', () => {
     })
     renderHelp()
 
+    await user.click(await screen.findByRole('heading', { name: 'Inquiry inbox' }))
     const firstHeading = await screen.findByRole('heading', { name: 'Newer schedule concern' })
     const firstCard = firstHeading.closest('article')
     const secondCard = screen.getByRole('heading', { name: 'Schedule access' }).closest('article')

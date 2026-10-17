@@ -363,6 +363,22 @@ export function HelpPage() {
             <a className="btn-secondary justify-start" href={`tel:${contact.phone.replace(/\s/g, '')}`}><Phone size={18} aria-hidden /> {contact.phone}</a>
           </div>
         </details>
+        {role === 'member' ? (
+          <section className="card p-4" aria-labelledby="privacy-notice-help-title">
+            <h2 id="privacy-notice-help-title" className="text-title font-bold text-slate-900">
+              Privacy Notice
+            </h2>
+            <p className="mt-1 text-body text-slate-600">
+              Learn how we handle your personal information and understand your privacy rights.
+            </p>
+            <Link
+              className="mt-2 inline-flex min-h-12 items-center font-semibold text-brand-800 underline underline-offset-2"
+              to="/privacy"
+            >
+              Read the Privacy Notice
+            </Link>
+          </section>
+        ) : null}
         <Toast message={toast?.message ?? null} fadingOut={toastFadingOut} />
       </main>
     </AppShell>

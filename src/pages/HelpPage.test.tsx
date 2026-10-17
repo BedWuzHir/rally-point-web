@@ -157,6 +157,23 @@ describe('Help inquiry workflow', () => {
     expect(sectionTitles()).toEqual(['Quick answers', 'Platform operations'])
   })
 
+  it('places a Privacy Notice link after Contact Us for members only', () => {
+    authState.user = null
+    const view = renderHelp()
+    const contact = screen.getByRole('heading', { name: 'Contact staff' }).closest('details')
+    const privacySection = screen.getByRole('heading', { name: 'Privacy Notice' }).closest('section')
+
+    expect(contact).not.toBeNull()
+    expect(privacySection).not.toBeNull()
+    expect(contact!.compareDocumentPosition(privacySection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Read the Privacy Notice' })).toHaveAttribute('href', '/privacy')
+
+    view.unmount()
+    authState.user = staffUser
+    renderHelp()
+    expect(screen.queryByRole('link', { name: 'Read the Privacy Notice' })).not.toBeInTheDocument()
+  })
+
   it('shows role-specific quick answers with links to existing destinations', async () => {
     const user = userEvent.setup()
     authState.user = staffUser

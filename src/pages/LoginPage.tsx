@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   Camera,
@@ -370,6 +370,19 @@ export default function LoginPage({ joinClub }: { joinClub?: PublicClub } = {}) 
                 </p>
               ) : null}
 
+              {mode === 'join' ? (
+                <p className="text-sm leading-relaxed text-slate-600">
+                  By registering, you acknowledge that you have read our{' '}
+                  <Link
+                    className="inline-flex min-h-12 items-center font-semibold text-brand-800 underline underline-offset-2"
+                    to="/privacy"
+                  >
+                    Privacy Notice
+                  </Link>
+                  .
+                </p>
+              ) : null}
+
               <button className="btn-primary gap-2" type="submit" disabled={busy} aria-busy={busy}>
                 {busy
                   ? 'Please wait…'
@@ -497,6 +510,14 @@ export default function LoginPage({ joinClub }: { joinClub?: PublicClub } = {}) 
                 Social links will be added when the official pages are confirmed.
               </p>
             </section>
+            <p className="mt-4 border-t border-slate-200 pt-3 text-center text-sm text-slate-600">
+              <Link
+                className="inline-flex min-h-12 items-center font-semibold text-brand-800 underline underline-offset-2"
+                to="/privacy"
+              >
+                Privacy Notice
+              </Link>
+            </p>
           </div>
         </div>
       </div>

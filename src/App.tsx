@@ -30,8 +30,10 @@ import { useEffect } from 'react'
 import { api } from './lib/api'
 import { HelpPage } from './pages/HelpPage'
 import { SuperadminPage } from './pages/Superadmin'
+
 import { JoinClubPage } from './pages/JoinClub'
 import { homeFor } from './lib/roleHome'
+import { PrivacyNoticePage } from './pages/PrivacyNoticePage'
 
 function Protected({ roles }: { roles?: Role[] }) {
   const { user, loading } = useAuth()
@@ -67,6 +69,7 @@ function AppRoutes() {
   return (
       <Routes key={activeClub?.club_id ?? 'no-club'}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/privacy" element={<PrivacyNoticePage />} />
         <Route path="/" element={<RootRedirect />} />
         {/* Club join links: sign up, or join while signed in */}
         <Route path="/join/:slug" element={<JoinClubPage />} />

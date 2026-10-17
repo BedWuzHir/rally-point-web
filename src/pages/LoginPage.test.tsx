@@ -198,6 +198,43 @@ describe("LoginPage authentication form safety", () => {
     expect(within(socialSection).getByText("Social links will be added when the official pages are confirmed.")).toBeInTheDocument();
   });
 
+  it("links to the public Privacy Notice", () => {
+    renderLogin();
+
+    expect(screen.getByRole("link", { name: "Privacy Notice" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+  });
+
+  it("shows the Privacy Notice acknowledgement only during signup", async () => {
+    const user = userEvent.setup();
+    renderLogin();
+
+    expect(
+      screen.queryByText(/By registering, you acknowledge that you have read our/),
+    ).not.toBeInTheDocument();
+    await user.click(switchToJoin());
+
+    expect(
+      screen.getByText(/By registering, you acknowledge that you have read our/),
+    ).toBeInTheDocument();
+    const signupForm = screen
+      .getByRole("button", { name: "Join Rally Point" })
+      .closest("form");
+    if (!signupForm) throw new Error("Signup form is missing");
+    expect(within(signupForm).getByRole("link", { name: "Privacy Notice" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "Log in" })[0]);
+    await user.click(screen.getByRole("button", { name: "Forgot password?" }));
+    expect(
+      screen.queryByText(/By registering, you acknowledge that you have read our/),
+    ).not.toBeInTheDocument();
+  });
+
   it("sends a password reset request and shows a success message", async () => {
     const user = userEvent.setup();
     authState.resetPassword.mockResolvedValue(undefined);

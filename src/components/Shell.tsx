@@ -12,7 +12,8 @@ import {
   UserRound,
   Users,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import type { ClubRole, Role } from '../types'
 import { useAuth } from '../context/AuthContext'
 import { homeFor } from '../lib/roleHome'
@@ -124,7 +125,7 @@ function tabsFor(role: Role) {
 }
 
 export function SideNav({ role }: { role: Role }) {
-  const { user, signOut, activeClub } = useAuth()
+  const { user, activeClub } = useAuth()
   const tabs = tabsFor(role)
   const placeName = activeClub?.name ?? (role === 'superadmin' ? 'Rally Point platform' : 'Rally Point')
   const roleLabel =
@@ -169,14 +170,12 @@ export function SideNav({ role }: { role: Role }) {
         ))}
       </nav>
 
-      <button
-        type="button"
-        onClick={() => void signOut()}
+      <SignOutAction
         className="side-nav-link control-feedback mt-4 w-full border-0 bg-transparent cursor-pointer text-left"
       >
         <LogOut size={22} aria-hidden />
         Log out
-      </button>
+      </SignOutAction>
     </aside>
   )
 }
@@ -274,17 +273,117 @@ export function AppHeader({
 }
 
 export function SignOutButton() {
-  const { signOut } = useAuth()
+  const { user } = useAuth()
+  if (user?.role === 'member') return null
+
   return (
-    <button
-      type="button"
-      onClick={() => void signOut()}
+    <SignOutAction
       className="control-feedback min-h-12 min-w-12 px-3 rounded-2xl border-2 border-slate-200 flex items-center justify-center gap-1.5 text-slate-700 text-body font-bold md:hidden"
-      aria-label="Log out"
+      iconOnly
     >
       <LogOut size={18} aria-hidden />
       <span className="sr-only">Log out</span>
-    </button>
+    </SignOutAction>
+  )
+}
+
+export function SignOutAction({
+  className,
+  children,
+  iconOnly = false,
+}: {
+  className: string
+  children: ReactNode
+  iconOnly?: boolean
+}) {
+  const { signOut } = useAuth()
+  const [confirming, setConfirming] = useState(false)
+  const opener = useRef<HTMLButtonElement>(null)
+  const cancelButton = useRef<HTMLButtonElement>(null)
+  const dialog = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!confirming) return
+
+    const trigger = opener.current
+    cancelButton.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setConfirming(false)
+        return
+      }
+      if (event.key !== 'Tab') return
+
+      const buttons = dialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
+      if (!buttons?.length) return
+      const first = buttons[0]
+      const last = buttons[buttons.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      if (trigger?.isConnected) trigger.focus()
+    }
+  }, [confirming])
+
+  return (
+    <>
+      <button
+        ref={opener}
+        type="button"
+        onClick={() => setConfirming(true)}
+        className={className}
+        aria-label={iconOnly ? 'Log out' : undefined}
+        aria-haspopup="dialog"
+        aria-expanded={confirming}
+      >
+        {children}
+      </button>
+      {confirming ? createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+          <div
+            ref={dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sign-out-title"
+            aria-describedby="sign-out-description"
+            className="card w-full max-w-sm p-5"
+          >
+            <h2 id="sign-out-title" className="text-title font-bold text-slate-900">
+              Log out?
+            </h2>
+            <p id="sign-out-description" className="text-body text-slate-600 mt-2">
+              You can sign back in any time.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                ref={cancelButton}
+                type="button"
+                onClick={() => setConfirming(false)}
+                className="control-feedback min-h-14 rounded-xl border border-slate-300 px-3 text-body font-semibold text-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="control-feedback min-h-14 rounded-xl bg-red-700 px-3 text-body font-semibold text-white"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      ) : null}
+    </>
   )
 }
 

@@ -3,12 +3,14 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MyClub, Role } from '../types'
-import { AppHeader, AppShell, BottomNav, ClubSwitcher } from './Shell'
+import { AppHeader, AppShell, BottomNav, ClubSwitcher, SideNav, SignOutButton } from './Shell'
 
 const auth = vi.hoisted(() => ({
   clubs: [] as MyClub[],
   activeClub: null as MyClub | null,
   switchClub: vi.fn(),
+  signOut: vi.fn(),
+  role: 'member' as Role,
 }))
 
 vi.mock('../context/AuthContext', () => ({
@@ -16,8 +18,9 @@ vi.mock('../context/AuthContext', () => ({
     user: {
       email: 'member@rallypoint.local',
       full_name: 'Demo Member',
+      role: auth.role,
     },
-    signOut: vi.fn(),
+    signOut: auth.signOut,
     clubs: auth.clubs,
     activeClub: auth.activeClub,
     switchClub: auth.switchClub,
@@ -31,6 +34,8 @@ beforeEach(() => {
   auth.clubs = []
   auth.activeClub = null
   auth.switchClub.mockClear()
+  auth.signOut.mockClear()
+  auth.role = 'member'
 })
 
 const roleLinks: Record<Role, Array<[label: string, href: string]>> = {
@@ -160,6 +165,77 @@ describe('ClubSwitcher', () => {
 })
 
 describe('AppShell', () => {
+  it('keeps member logout out of the mobile header but confirms staff logout', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(
+      <div className="app-shell">
+        <div className="app-shell-desktop">
+          <MemoryRouter>
+            <AppHeader title="Member home" right={<SignOutButton />} />
+          </MemoryRouter>
+        </div>
+      </div>,
+    )
+    expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument()
+
+    auth.role = 'staff'
+    rerender(
+      <div className="app-shell">
+        <div className="app-shell-desktop">
+          <MemoryRouter>
+            <AppHeader title="Staff home" right={<SignOutButton />} />
+          </MemoryRouter>
+        </div>
+      </div>,
+    )
+    const logout = screen.getByRole('button', { name: 'Log out' })
+    await user.click(logout)
+    const dialog = screen.getByRole('dialog', { name: 'Log out?' })
+    expect(dialog).toBeInTheDocument()
+    expect(dialog.parentElement?.parentElement).toBe(document.body)
+    expect(document.querySelector('.app-shell')?.contains(dialog)).toBe(false)
+    expect(auth.signOut).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(logout).toHaveFocus()
+
+    await user.click(logout)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Log out' }))
+    expect(auth.signOut).toHaveBeenCalledTimes(1)
+  })
+
+  it('confirms logout from the desktop sidebar and supports Escape cancellation', async () => {
+    const user = userEvent.setup()
+    auth.role = 'admin'
+    render(
+      <div className="app-shell">
+        <MemoryRouter>
+          <SideNav role="admin" />
+        </MemoryRouter>
+      </div>,
+    )
+
+    const logout = screen.getByRole('button', { name: 'Log out' })
+    await user.click(logout)
+    const dialog = screen.getByRole('dialog', { name: 'Log out?' })
+    expect(dialog.parentElement?.parentElement).toBe(document.body)
+    expect(document.querySelector('.app-shell')?.contains(dialog)).toBe(false)
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus()
+    expect(auth.signOut).not.toHaveBeenCalled()
+
+    await user.keyboard('{Shift>}{Tab}{/Shift}')
+    expect(within(dialog).getByRole('button', { name: 'Log out' })).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(logout).toHaveFocus()
+    expect(auth.signOut).not.toHaveBeenCalled()
+
+    await user.click(logout)
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Log out' }))
+    expect(auth.signOut).toHaveBeenCalledTimes(1)
+  })
+
   it('shares a centered content rail while preserving both navigation variants', () => {
     const { container } = render(
       <MemoryRouter>

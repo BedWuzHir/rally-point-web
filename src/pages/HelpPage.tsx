@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { HelpCircle, Mail, Phone, RefreshCw, Send } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { AppHeader, AppShell, SignOutButton, Toast } from '../components/Shell'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
 import { signedInHelpFaqs } from '../lib/helpContent'
+import type { PrivacyNoticeState } from '../lib/privacyNotice'
 import type { InquiryCategory, InquiryStatus, Notification, Role, SupportInquiry } from '../types'
 import { fmtDateTime } from '../types'
 
@@ -64,6 +65,8 @@ export function HelpPage() {
   const [toastFadingOut, setToastFadingOut] = useState(false)
   const loadingInquiriesRef = useRef(false)
   const hasLoadedInquiriesRef = useRef(false)
+  const inquiryRequestRef = useRef(0)
+  const location = useLocation()
 
   useEffect(() => {
     setToastFadingOut(false)
@@ -77,9 +80,30 @@ export function HelpPage() {
     }
   }, [toast])
 
+  // Staff see the unread-update count before opening "Your inquiries".
+  // A failure here only hides the count; opening the section loads and reports errors.
+  useEffect(() => {
+    if (!user || role !== 'staff') return
+    let cancelled = false
+    api
+      .notifications(user.id)
+      .then((updates) => {
+        if (!cancelled && !hasLoadedInquiriesRef.current) {
+          setNotifications(updates.filter((notification) => notification.title === 'Inquiry update'))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [role, user])
+
+  // A forced load (Refresh, or after a save) always runs; only the newest load's result is kept.
   const loadInquiries = useCallback(async (force = false) => {
     if (!user || !canUseInquiries) return
-    if (loadingInquiriesRef.current || (hasLoadedInquiriesRef.current && !force)) return
+    if (!force && (loadingInquiriesRef.current || hasLoadedInquiriesRef.current)) return
+    const request = ++inquiryRequestRef.current
+    const isLatest = () => request === inquiryRequestRef.current
     loadingInquiriesRef.current = true
     setLoadingInquiries(true)
     setLoadingError(null)
@@ -88,15 +112,19 @@ export function HelpPage() {
         api.inquiries(user.id, role),
         role === 'staff' ? api.notifications(user.id) : Promise.resolve([]),
       ])
+      if (!isLatest()) return
       setInquiries(rows)
       setNotifications(updates.filter((notification) => notification.title === 'Inquiry update'))
       hasLoadedInquiriesRef.current = true
       setHasLoadedInquiries(true)
     } catch (error) {
+      if (!isLatest()) return
       setLoadingError(error instanceof Error ? error.message : 'Unable to load inquiries.')
     } finally {
-      loadingInquiriesRef.current = false
-      setLoadingInquiries(false)
+      if (isLatest()) {
+        loadingInquiriesRef.current = false
+        setLoadingInquiries(false)
+      }
     }
   }, [canUseInquiries, role, user])
 
@@ -114,7 +142,7 @@ export function HelpPage() {
       })
       setSubject('')
       setMessage('')
-      if (hasLoadedInquiriesRef.current) await loadInquiries(true)
+      if (hasLoadedInquiriesRef.current || loadingInquiriesRef.current) await loadInquiries(true)
       setToast({ message: 'Your inquiry was sent. The team will follow up.', type: 'success' })
     } catch (error) {
       setToast({
@@ -227,7 +255,7 @@ export function HelpPage() {
           }}>
             <summary className="cursor-pointer min-h-12">
               <span role="heading" aria-level={2} className="text-title font-bold text-slate-900">Your inquiries</span>
-              {hasLoadedInquiries && unreadUpdateCount > 0 ? (
+              {unreadUpdateCount > 0 ? (
                 <span className="ml-2 text-body font-semibold text-brand-800">
                   {unreadUpdateCount} unread {unreadUpdateCount === 1 ? 'update' : 'updates'}
                 </span>
@@ -374,6 +402,7 @@ export function HelpPage() {
             <Link
               className="mt-2 inline-flex min-h-12 items-center font-semibold text-brand-800 underline underline-offset-2"
               to="/privacy"
+              state={{ from: location.pathname } satisfies PrivacyNoticeState}
             >
               Read the Privacy Notice
             </Link>

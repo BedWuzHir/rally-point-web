@@ -28,43 +28,24 @@ export const helpFaqs = [
   },
 ] as const
 
+type HelpAction = { label: string; to: string }
+
+// Members get the same answers as the login page, plus a link where one helps.
+const memberActions: Partial<Record<(typeof helpFaqs)[number]['question'], HelpAction>> = {
+  'How do I book a court?': { label: 'Go to Book', to: '/member/book' },
+  'How do I check in?': { label: 'Open My QR', to: '/member/pass' },
+  'How do I renew my membership?': { label: 'Open Account', to: '/member/profile' },
+}
+
 export const signedInHelpFaqs: Record<
   Role,
   readonly {
     question: string
     answer: string
-    action?: { label: string; to: string }
+    action?: HelpAction
   }[]
 > = {
-  member: [
-    {
-      question: 'How do I book a court?',
-      answer:
-        'Choose a date, court, and time in Book, then complete payment. Your booking is confirmed after payment.',
-      action: { label: 'Go to Book', to: '/member/book' },
-    },
-    {
-      question: 'How do I check in?',
-      answer: 'Show your My QR code to staff when you arrive.',
-      action: { label: 'Open My QR', to: '/member/pass' },
-    },
-    {
-      question: 'Can I cancel or change a booking?',
-      answer:
-        'Contact staff as soon as possible. They can check the booking status and available options.',
-    },
-    {
-      question: 'How do I renew my membership?',
-      answer:
-        'Open your Account or membership card and choose Renew. Contact staff if your membership details need correcting.',
-      action: { label: 'Open Account', to: '/member/profile' },
-    },
-    {
-      question: 'What are the club hours?',
-      answer:
-        'Rally Point is open daily from 6:00 AM to 10:00 PM. Court availability can change during events and maintenance.',
-    },
-  ],
+  member: helpFaqs.map((faq) => ({ ...faq, action: memberActions[faq.question] })),
   staff: [
     {
       question: 'Where can I check in a member?',

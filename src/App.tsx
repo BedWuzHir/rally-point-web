@@ -120,6 +120,8 @@ function AppRoutes() {
           <Route path="/superadmin" element={<SuperadminPage section="overview" />} />
           <Route path="/superadmin/clubs" element={<SuperadminPage section="clubs" />} />
           <Route path="/superadmin/ledger" element={<SuperadminPage section="ledger" />} />
+          {/* Platform FAQs and contacts only; Help loads no club data for superadmins. */}
+          <Route path="/superadmin/help" element={<HelpPage />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

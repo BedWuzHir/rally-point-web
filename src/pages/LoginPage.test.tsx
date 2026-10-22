@@ -207,6 +207,30 @@ describe("LoginPage authentication form safety", () => {
     );
   });
 
+  it("keeps a join link's club and the typed details when the Privacy Notice is opened", () => {
+    render(
+      <MemoryRouter>
+        <LoginPage joinClub={{ id: "club-davao", slug: "rally-point-davao", name: "Rally Point Davao" }} />
+      </MemoryRouter>,
+    );
+
+    const signupForm = screen
+      .getByRole("button", { name: "Join Rally Point" })
+      .closest("form");
+    if (!signupForm) throw new Error("Signup form is missing");
+    const formLink = within(signupForm).getByRole("link", { name: "Privacy Notice" });
+    // A new tab, so leaving the form never clears what was typed.
+    expect(formLink).toHaveAttribute("href", "/privacy?club=rally-point-davao");
+    expect(formLink).toHaveAttribute("target", "_blank");
+    expect(within(signupForm).getByText(/opens in a new tab/)).toBeInTheDocument();
+
+    const links = screen.getAllByRole("link", { name: "Privacy Notice" });
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/privacy?club=rally-point-davao",
+      "/privacy?club=rally-point-davao",
+    ]);
+  });
+
   it("shows the Privacy Notice acknowledgement only during signup", async () => {
     const user = userEvent.setup();
     renderLogin();

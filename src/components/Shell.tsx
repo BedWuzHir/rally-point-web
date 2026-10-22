@@ -74,6 +74,7 @@ const superadminTabs = [
   { to: '/superadmin', end: true, label: 'Overview', icon: LayoutDashboard },
   { to: '/superadmin/clubs', label: 'Clubs', icon: Building2 },
   { to: '/superadmin/ledger', label: 'Ledger', icon: Coins },
+  { to: '/superadmin/help', label: 'Help', icon: HelpCircle },
 ]
 
 const clubRoleLabel: Record<ClubRole, string> = { member: 'Member', staff: 'Staff', admin: 'Admin' }
@@ -298,30 +299,67 @@ export function SignOutAction({
 }) {
   const { signOut } = useAuth()
   const [confirming, setConfirming] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+  const [signOutError, setSignOutError] = useState<string | null>(null)
   const opener = useRef<HTMLButtonElement>(null)
   const cancelButton = useRef<HTMLButtonElement>(null)
   const dialog = useRef<HTMLDivElement>(null)
+  const signingOutRef = useRef(false)
+
+  function closeDialog() {
+    if (signingOutRef.current) return
+    setSignOutError(null)
+    setConfirming(false)
+  }
+
+  async function confirmSignOut() {
+    if (signingOutRef.current) return
+    signingOutRef.current = true
+    setSigningOut(true)
+    setSignOutError(null)
+    try {
+      await signOut()
+    } catch {
+      setSignOutError('We could not log you out. Check your connection and try again.')
+    } finally {
+      signingOutRef.current = false
+      setSigningOut(false)
+    }
+  }
 
   useEffect(() => {
     if (!confirming) return
 
     const trigger = opener.current
+    // Keep the page behind the dialog out of reach while it is open.
+    const appRoot = document.getElementById('root')
+    const wasInert = appRoot?.inert ?? false
+    if (appRoot) appRoot.inert = true
     cancelButton.current?.focus()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (signingOutRef.current) return
+        setSignOutError(null)
         setConfirming(false)
         return
       }
       if (event.key !== 'Tab') return
 
       const buttons = dialog.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
-      if (!buttons?.length) return
+      if (!buttons?.length) {
+        event.preventDefault()
+        return
+      }
       const first = buttons[0]
       const last = buttons[buttons.length - 1]
-      if (event.shiftKey && document.activeElement === first) {
+      const active = document.activeElement
+      if (!dialog.current?.contains(active)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
+      } else if (event.shiftKey && active === first) {
         event.preventDefault()
         last.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && active === last) {
         event.preventDefault()
         first.focus()
       }
@@ -329,6 +367,7 @@ export function SignOutAction({
     window.addEventListener('keydown', onKeyDown)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
+      if (appRoot) appRoot.inert = wasInert
       if (trigger?.isConnected) trigger.focus()
     }
   }, [confirming])
@@ -347,7 +386,13 @@ export function SignOutAction({
         {children}
       </button>
       {confirming ? createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4"
+          onClick={(event) => {
+            // A tap on the dimmed backdrop cancels, like the Cancel button.
+            if (event.target === event.currentTarget) closeDialog()
+          }}
+        >
           <div
             ref={dialog}
             role="dialog"
@@ -362,21 +407,29 @@ export function SignOutAction({
             <p id="sign-out-description" className="text-body text-slate-600 mt-2">
               You can sign back in any time.
             </p>
+            {signOutError ? (
+              <p role="alert" className="text-body font-semibold text-red-700 mt-3">
+                {signOutError}
+              </p>
+            ) : null}
             <div className="mt-5 grid grid-cols-2 gap-3">
               <button
                 ref={cancelButton}
                 type="button"
-                onClick={() => setConfirming(false)}
+                onClick={closeDialog}
+                disabled={signingOut}
                 className="control-feedback min-h-14 rounded-xl border border-slate-300 px-3 text-body font-semibold text-slate-800"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={() => void signOut()}
+                onClick={() => void confirmSignOut()}
+                disabled={signingOut}
+                aria-busy={signingOut}
                 className="control-feedback min-h-14 rounded-xl bg-red-700 px-3 text-body font-semibold text-white"
               >
-                Log out
+                {signingOut ? 'Logging out…' : 'Log out'}
               </button>
             </div>
           </div>

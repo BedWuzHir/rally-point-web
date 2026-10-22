@@ -11,7 +11,7 @@ Developer handoff for the public login FAQ preview and the role-aware Help secti
 | Admin | View the FAQ and superadmin contact details; submit inquiries; view the inquiry inbox; change inquiry status; send one response per inquiry. |
 | Superadmin | View the FAQ and Platform operations contact details. Superadmins do not submit inquiries or load inquiry history/inbox data from Help. |
 
-Each role has a Help destination in the role-specific navigation. The full Help pages are `/member/help`, `/staff/help`, and `/admin/help`; Superadmin uses `/admin/help`. Public login FAQs use the shared `helpFaqs` from `src/lib/helpContent.ts`; signed-in Help uses separate role-specific FAQs from the same file.
+Each role has a Help destination in the role-specific navigation. The full Help pages are `/member/help`, `/staff/help`, `/admin/help`, and `/superadmin/help` (platform FAQs and contacts only; it loads no club data). Public login FAQs use the shared `helpFaqs` from `src/lib/helpContent.ts`; signed-in Help uses separate role-specific FAQs from the same file.
 Role-specific FAQ links lead directly to existing Book, My QR, Account, Check in, Schedule, Courts, Bookings, Floor, or Superadmin Overview pages as appropriate. The FAQ entries only describe workflows already present in the app.
 
 Each top-level Help section available to the current role (FAQ, contact details, inquiry form, and staff history or admin inbox) is an independent expandable section. They start collapsed; users can open multiple sections at once. Quick answers appear first, followed by inquiry sections when available, and Contact appears last. Native disclosure summaries are keyboard operable. Individual FAQ questions remain expandable inside the FAQ section.
@@ -22,7 +22,9 @@ The public login screen shows three expandable FAQ entries from the same shared 
 
 Staff and Admin submissions require a category, subject (up to 120 characters), and message (up to 2,000 characters). Superadmins currently have no inquiry form in Help. A submission starts with status `open`.
 
-Staff inquiry history and Admin inbox data are fetched when the corresponding section is first opened or when **Refresh** is used. A Staff section shows the unread inquiry-update count after data is loaded; the Admin inbox shows the count of open inquiries after data is loaded.
+Staff inquiry history and Admin inbox data are fetched when the corresponding section is first opened or when **Refresh** is used. Staff inquiry-update notifications are fetched when Help opens, so the collapsed **Your inquiries** section already shows the unread count; the Admin inbox shows the count of open inquiries after data is loaded. **Refresh** and the reload after a save always fetch fresh data, even while an earlier load is still running.
+
+The Privacy Notice (`/privacy`) names the club it is for: the club from a join link (`/privacy?club=<club-slug>`), the signed-in club, or Rally Point Gensan by default. Only Rally Point Gensan shows its support email; other clubs are told to ask their club's staff. The sign-up form opens the notice in a new tab so typed details are kept, and **Back** returns to the page the notice was opened from.
 
 Admins can set an inquiry to `open`, `in_progress`, or `resolved`. An Admin may save one response of up to 2,000 characters per inquiry. After responding, the response is shown on both Admin and submitting Staff views. Admins may still change the status later.
 

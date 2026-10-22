@@ -167,7 +167,6 @@ describe('Help inquiry workflow', () => {
     expect(privacySection).not.toBeNull()
     expect(contact!.compareDocumentPosition(privacySection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Read the Privacy Notice' })).toHaveAttribute('href', '/privacy')
-
     view.unmount()
     authState.user = staffUser
     renderHelp()
@@ -223,18 +222,47 @@ describe('Help inquiry workflow', () => {
     if (!inquiryFormSection) throw new Error('Expected inquiry form disclosure')
     expect(inquiryFormSection.open).toBe(false)
     expect(api.inquiries).not.toHaveBeenCalled()
-    expect(api.notifications).not.toHaveBeenCalled()
+    // The unread count shows on the collapsed section, before history is loaded.
+    expect(await screen.findByText('1 unread update')).toBeInTheDocument()
+    expect(api.notifications).toHaveBeenCalledWith(staffUser.id)
+    expect(api.inquiries).not.toHaveBeenCalled()
     await user.click(inquiriesHeading)
     expect(await screen.findByText('Schedule access')).toBeInTheDocument()
     expect(screen.getByText(updateNotification.body)).toBeInTheDocument()
     expect(api.inquiries).toHaveBeenCalledWith(staffUser.id, 'staff')
-    expect(await screen.findByText('1 unread update')).toBeInTheDocument()
+    expect(screen.getByText('1 unread update')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Refresh' }))
     await waitFor(() => expect(api.inquiries).toHaveBeenCalledTimes(2))
 
     await user.click(screen.getByRole('button', { name: 'Mark read' }))
     expect(api.markNotifRead).toHaveBeenCalledWith(updateNotification.id)
+  })
+
+  it('reloads after a submit even while an earlier load is still running, and keeps the newer result', async () => {
+    const user = userEvent.setup()
+    let finishFirstLoad: (rows: SupportInquiry[]) => void = () => {}
+    const sentInquiry = { ...inquiry, id: 'inquiry-2', subject: 'New question' }
+    vi.mocked(api.inquiries)
+      .mockImplementationOnce(() => new Promise((resolve) => { finishFirstLoad = resolve }))
+      .mockResolvedValueOnce([sentInquiry, inquiry])
+    vi.mocked(api.createInquiry).mockResolvedValue(sentInquiry)
+    renderHelp()
+
+    await user.click(await screen.findByRole('heading', { name: 'Your inquiries' }))
+    expect(api.inquiries).toHaveBeenCalledTimes(1)
+
+    await user.click(screen.getByRole('heading', { name: 'Ask a question or submit an inquiry' }))
+    await user.type(screen.getByLabelText('Subject'), 'New question')
+    await user.type(screen.getByLabelText('Your question or details'), 'Please check my booking.')
+    await user.click(screen.getByRole('button', { name: 'Send inquiry' }))
+
+    await waitFor(() => expect(api.inquiries).toHaveBeenCalledTimes(2))
+    expect(await screen.findByRole('heading', { name: 'New question' })).toBeInTheDocument()
+
+    // The slower first load finishes last with older rows; they must not replace the newer list.
+    await act(async () => finishFirstLoad([inquiry]))
+    expect(screen.getByRole('heading', { name: 'New question' })).toBeInTheDocument()
   })
 
   it('fades and removes a successful inquiry confirmation after four seconds', async () => {
